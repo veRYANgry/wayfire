@@ -53,6 +53,7 @@ class wayfire_command : public wf::plugin_interface_t
         BINDING_NORMAL,
         BINDING_REPEAT,
         BINDING_ALWAYS,
+        BINDING_RELEASE,
     };
 
     bool on_binding(std::string command, binding_mode mode,
@@ -75,7 +76,21 @@ class wayfire_command : public wf::plugin_interface_t
             return false;
         }
 
-        wf::get_core().run(command.c_str());
+        if (mode == BINDING_RELEASE){
+            repeat.repeat_command = command;
+            if (data.source == wf::activator_source_t::KEYBINDING)
+            {
+                repeat.pressed_key = data.activation_data;
+            } else
+            {
+                repeat.pressed_button = data.activation_data;
+            }
+            wf::get_core().connect_signal("keyboard_key", &on_key_event_release);
+            return true;
+            
+        } else {
+            wf::get_core().run(command.c_str());
+        }
 
         /* No repeat necessary in any of those cases */
         if ((mode != BINDING_REPEAT) ||
@@ -171,6 +186,18 @@ class wayfire_command : public wf::plugin_interface_t
         }
     };
 
+        wf::signal_connection_t on_key_event_release = [=] (wf::signal_data_t *data)
+    {
+        auto ev = static_cast<
+            wf::input_event_signal<wlr_event_keyboard_key>*>(data);
+        if ((ev->event->keycode == repeat.pressed_key) &&
+            (ev->event->state == WLR_KEY_RELEASED))
+        {
+            wf::get_core().run(repeat.repeat_command.c_str());
+            reset_repeat();
+        }
+    };
+
   public:
     wf::option_wrapper_t<wf::config::compound_list_t<
         std::string, wf::activatorbinding_t>> regular_bindings{"command/bindings"};
@@ -185,6 +212,11 @@ class wayfire_command : public wf::plugin_interface_t
         "command/always_bindings"
     };
 
+        wf::option_wrapper_t<wf::config::compound_list_t<
+        std::string, wf::activatorbinding_t>> release_bindings{
+        "command/release_bindings"
+    };
+
     std::function<void()> setup_bindings_from_config = [=] ()
     {
         clear_bindings();
@@ -193,7 +225,8 @@ class wayfire_command : public wf::plugin_interface_t
         auto regular    = regular_bindings.value();
         auto repeatable = repeat_bindings.value();
         auto always     = always_bindings.value();
-        bindings.resize(regular.size() + repeatable.size() + always.size());
+        auto release    = release_bindings.value();
+        bindings.resize(regular.size() + repeatable.size() + always.size() + release.size());
         size_t i = 0;
 
         const auto& push_bindings = [&] (
@@ -213,6 +246,7 @@ class wayfire_command : public wf::plugin_interface_t
         push_bindings(regular, BINDING_NORMAL);
         push_bindings(repeatable, BINDING_REPEAT);
         push_bindings(always, BINDING_ALWAYS);
+        push_bindings(release, BINDING_RELEASE);
     };
 
     void clear_bindings()
