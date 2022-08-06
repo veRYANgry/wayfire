@@ -24,7 +24,7 @@ static int repeat_once_handler(void *callback)
 
 /* Provides a way to bind specific commands to activator bindings.
  *
- * It supports 2 modes:
+ * It supports 4 modes:
  *
  * 1. Regular bindings
  * 2. Repeatable bindings - for example, if the user binds a keybinding, then
@@ -33,6 +33,8 @@ static int repeat_once_handler(void *callback)
  * prefix repeatable_
  * 3. Always bindings - bindings that can be executed even if a plugin is already
  * active, or if the screen is locked. They have a prefix always_
+ * 4. Release bindings - Execute a command when a binding is released. Useful for
+ * Push-To-Talk. They have a prefix release_
  * */
 
 class wayfire_command : public wf::plugin_interface_t
@@ -87,8 +89,8 @@ class wayfire_command : public wf::plugin_interface_t
                 repeat.pressed_button = data.activation_data;
                 wf::get_core().connect_signal("pointer_button", &on_button_event_release);
             }
+
             return true;
-            
         } else {
             wf::get_core().run(command.c_str());
         }
@@ -187,7 +189,7 @@ class wayfire_command : public wf::plugin_interface_t
         }
     };
 
-        wf::signal_connection_t on_key_event_release = [=] (wf::signal_data_t *data)
+    wf::signal_connection_t on_key_event_release = [=] (wf::signal_data_t *data)
     {
         auto ev = static_cast<
             wf::input_event_signal<wlr_event_keyboard_key>*>(data);
@@ -202,7 +204,7 @@ class wayfire_command : public wf::plugin_interface_t
         }
     };
 
-        wf::signal_connection_t on_button_event_release = [=] (wf::signal_data_t *data)
+    wf::signal_connection_t on_button_event_release = [=] (wf::signal_data_t *data)
     {
         auto ev = static_cast<
             wf::input_event_signal<wlr_event_pointer_button>*>(data);
