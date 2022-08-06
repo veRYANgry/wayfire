@@ -81,11 +81,12 @@ class wayfire_command : public wf::plugin_interface_t
             if (data.source == wf::activator_source_t::KEYBINDING)
             {
                 repeat.pressed_key = data.activation_data;
+                wf::get_core().connect_signal("keyboard_key", &on_key_event_release);
             } else
             {
                 repeat.pressed_button = data.activation_data;
+                wf::get_core().connect_signal("pointer_button", &on_button_event_release);
             }
-            wf::get_core().connect_signal("keyboard_key", &on_key_event_release);
             return true;
             
         } else {
@@ -194,7 +195,25 @@ class wayfire_command : public wf::plugin_interface_t
             (ev->event->state == WLR_KEY_RELEASED))
         {
             wf::get_core().run(repeat.repeat_command.c_str());
-            reset_repeat();
+            repeat.pressed_key = repeat.pressed_button = 0;
+            output->deactivate_plugin(grab_interface);
+
+            wf::get_core().disconnect_signal(&on_key_event_release);
+        }
+    };
+
+        wf::signal_connection_t on_button_event_release = [=] (wf::signal_data_t *data)
+    {
+        auto ev = static_cast<
+            wf::input_event_signal<wlr_event_pointer_button>*>(data);
+       if ((ev->event->button == repeat.pressed_button) &&
+            (ev->event->state == WLR_BUTTON_RELEASED))
+        {
+            wf::get_core().run(repeat.repeat_command.c_str());
+            repeat.pressed_key = repeat.pressed_button = 0;
+            output->deactivate_plugin(grab_interface);
+
+            wf::get_core().disconnect_signal(&on_button_event_release);
         }
     };
 
